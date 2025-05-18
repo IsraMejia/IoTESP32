@@ -1,11 +1,22 @@
 import network
 import socket
 import json
-from machine import Pin
+from machine import Pin, PWM
+import time
 
-# Pines físicos
-pin_ventilador = Pin(15, Pin.OUT)  # Pines de conexion
-pin_bomba = Pin(4, Pin.OUT)
+# Servo conectado al pin GPIO14
+servo = PWM(Pin(14), freq=50)
+
+# Función para mover el servo (ajustar duty según tu servo)
+def mover_atomizador(activar):
+    if activar:
+        for _ in range(3):
+            servo.duty(120)  # posición de activación
+            time.sleep(0.5)
+            servo.duty(40)   # posición de reposo
+            time.sleep(0.5)
+    else:
+        servo.duty(40)  # reposo definitivo
 
 # Conexión WiFi
 ssid = 'TU_SSID'
@@ -17,19 +28,16 @@ def conectar_wifi():
     wlan.connect(ssid, password)
     while not wlan.isconnected():
         pass
-    print('Conectado a WiFi:', wlan.ifconfig())
+    print('WiFi conectada:', wlan.ifconfig())
 
 def manejar_peticion(path, body):
     try:
         data = json.loads(body)
         estado = data.get("estado", False)
 
-        if path == '/ventilador':
-            pin_ventilador.value(1 if estado else 0)
-            return "Ventilador actualizado"
-        elif path == '/bomba':
-            pin_bomba.value(1 if estado else 0)
-            return "Bomba actualizada"
+        if path == '/atomizador':
+            mover_atomizador(estado)
+            return "Atomizador movido"
         else:
             return "Ruta no válida"
     except Exception as e:
@@ -40,15 +48,14 @@ def iniciar_servidor():
     s = socket.socket()
     s.bind(addr)
     s.listen(1)
-    print("Servidor escuchando en puerto 80")
+    print("Servidor HTTP en puerto 80...")
 
     while True:
         cl, addr = s.accept()
-        print('Cliente conectado desde', addr)
+        print('Conexión desde', addr)
         request = cl.recv(1024).decode()
         headers, _, body = request.partition('\r\n\r\n')
-        first_line = headers.split('\n')[0]
-        method, path, _ = first_line.split()
+        method, path, _ = headers.split('\n')[0].split()
 
         if method == 'POST':
             respuesta = manejar_peticion(path, body)

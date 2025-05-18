@@ -1,13 +1,20 @@
 import network
 import socket
 import json
-from machine import Pin
+from machine import Pin, PWM
+import time
 
-# Pines físicos
-pin_ventilador = Pin(15, Pin.OUT)  # Pines de conexion
-pin_bomba = Pin(4, Pin.OUT)
+# Servo conectado al pin GPIO12
+servo = PWM(Pin(12), freq=50)
 
-# Conexión WiFi
+def mover_puerta(abrir):
+    if abrir:
+        servo.duty(120)  # ángulo para abrir
+    else:
+        servo.duty(40)   # ángulo para cerrar
+    time.sleep(1)
+
+# WiFi config
 ssid = 'TU_SSID'
 password = 'TU_PASSWORD'
 
@@ -24,12 +31,9 @@ def manejar_peticion(path, body):
         data = json.loads(body)
         estado = data.get("estado", False)
 
-        if path == '/ventilador':
-            pin_ventilador.value(1 if estado else 0)
-            return "Ventilador actualizado"
-        elif path == '/bomba':
-            pin_bomba.value(1 if estado else 0)
-            return "Bomba actualizada"
+        if path == '/puerta':
+            mover_puerta(estado)
+            return "Puerta movida"
         else:
             return "Ruta no válida"
     except Exception as e:
@@ -40,15 +44,14 @@ def iniciar_servidor():
     s = socket.socket()
     s.bind(addr)
     s.listen(1)
-    print("Servidor escuchando en puerto 80")
+    print("Servidor HTTP en puerto 80...")
 
     while True:
         cl, addr = s.accept()
         print('Cliente conectado desde', addr)
         request = cl.recv(1024).decode()
         headers, _, body = request.partition('\r\n\r\n')
-        first_line = headers.split('\n')[0]
-        method, path, _ = first_line.split()
+        method, path, _ = headers.split('\n')[0].split()
 
         if method == 'POST':
             respuesta = manejar_peticion(path, body)
