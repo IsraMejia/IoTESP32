@@ -4,15 +4,56 @@ import json
 from machine import Pin, PWM
 import time
 
-# Servo conectado al pin GPIO12
-servo = PWM(Pin(12), freq=50)
+# Declaración del objeto y funciones
+class ServoMotor:
+    def __init__(self, control_pin):
+        self.pwm = PWM(Pin(control_pin), freq=50)
 
-def mover_puerta(abrir):
-    if abrir:
-        servo.duty(120)  # ángulo para abrir
-    else:
-        servo.duty(40)   # ángulo para cerrar
-    time.sleep(1)
+    def moverAng(self, angulo):
+        duty = int(1638 + (angulo / 180) * (8191 - 1638))
+        self.pwm.duty_u16(duty)
+        print(f"Servo movido a {angulo} grados.")
+
+    def detener(self):
+        self.pwm.deinit()
+        print("Servo desactivado.")
+
+# Pines de conexión
+aspersor = ServoMotor(control_pin=33)
+puerta = ServoMotor(control_pin=26)
+
+# Control de servomotores
+puerta_abierta = False  # Estado inicial
+
+try:
+    while True:
+        comando = input("Ingrese 'A' para accionar el aspersor, 'P' para alternar puerta, o 'S' para salir: ").upper()
+
+        if comando == "A":
+            aspersor.moverAng(180)
+            print("Psssss")
+            sleep(1)
+            aspersor.moverAng(40)
+            sleep(1)
+
+        elif comando == "P":
+            if puerta_abierta:
+                puerta.moverAng(160)  # Cerrar
+                print("Puerta cerrada.")
+            else:
+                puerta.moverAng(50)   # Abrir
+                print("Puerta abierta.")
+            puerta_abierta = not puerta_abierta
+            sleep(1)
+
+        elif comando == "S":
+            print("Saliendo...")
+            break
+        else:
+            print("Comando no reconocido. Intente de nuevo.")
+finally:
+    aspersor.detener()
+    puerta.detener()
 
 # WiFi config
 ssid = 'TU_SSID'
